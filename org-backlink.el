@@ -88,14 +88,15 @@
                    (source-file (buffer-file-name))
                    (source-id (org-id-get)))
               (save-excursion
-                (org-open-at-point)
-
-                ;; otherwise we can process it right away
-                (funcall storefunc linkcache source-file source-path source-id)))))))
+                (condition-case nil
+                    (progn
+                      (org-open-at-point)
+                      (funcall storefunc linkcache source-file source-path source-id))
+                  ;; Just report it if some link fails here
+                (error (message (concat "Skipping not-openable link in " source-id))))))))))
 
     (setq org-backlink-cache linkcache)
     (message "Done.")))
-
 
 
 (defun org-backlink-mode-show-backlinks ()
