@@ -67,33 +67,32 @@
   (interactive)
   (let ((org-link-search-inhibit-query t)
         (linkcache (make-hash-table :test 'equal))
-        (storefunc (lambda (linkcache source-file source-title source-id)
-                     (let* ((dest (org-backlink-mode-get-heading-path-string))
-                            (entry (gethash dest linkcache))
+        (storefunc (lambda (linkcache source-file source-title source-id target-id)
+                     (let* ((entry (gethash target-id linkcache))
                             (link (list 'file source-file
                                         'path source-path
                                         'id source-id)))
-                       (message "Adding %s as a destination for source %s %s" dest source-file source-path)
+                       (message "Adding %s as a destination for source %s %s" target-id source-file source-path)
                        (unless (member link entry)
-                         (puthash dest
+                         (puthash target-id
                                   (cons link entry)
                                   linkcache))))))
     (dolist (file (org-backlink-mode-expand-files org-backlink-mode-files))
       (save-excursion
         (with-current-buffer (find-file-noselect file)
           (goto-char (point-min))
-          (while (re-search-forward "\\[\\[\\(file\\|id\\):.*?\\]\\[.*?\\]\\]" nil t)
+          (while (re-search-forward "\\[\\[\\(file\\|id\\):\\(.*?\\)\\(\\]\\)\\[.*?\\]\\]" nil t)
             (backward-char) ;; This search query lends us at the end of the link, where org-open-at-point cannot doesn't work
-            (let* ((source-path (org-backlink-mode-get-heading-path))
+            (condition-case nil
+                (let* ((target-id (buffer-substring-no-properties (match-beginning 2) (match-beginning 3)))
+                       (source-path (org-backlink-mode-get-heading-path))
                    (source-file (buffer-file-name))
                    (source-id (org-id-get)))
               (save-excursion
-                (condition-case nil
                     (progn
-                      (org-open-at-point)
-                      (funcall storefunc linkcache source-file source-path source-id))
+                      (funcall storefunc linkcache source-file source-path source-id target-id))))
                   ;; Just report it if some link fails here
-                (error (message (concat "Skipping not-openable link in " source-id))))))))))
+              (error (message (concat "Skipping not-openable link in " (org-id-get)))))))))
 
     (setq org-backlink-cache linkcache)
     (message "Done.")))
@@ -118,7 +117,7 @@
       (delete-overlay org-backlink-mode-overlay)
 
       (ignore-errors
-        (let ((backlinks (gethash (org-backlink-mode-get-heading-path-string)
+        (let ((backlinks (gethash (org-id-get)
                                   org-backlink-cache)))
           (save-excursion
             (goto-char org-backlink-current-entry-start)
